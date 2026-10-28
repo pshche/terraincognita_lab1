@@ -1,11 +1,7 @@
 ### пояснение для проверяющего
-До попадания БПЛА все прекрасно работало, к сожалению сейчас нельзя создавать новые диски, я писал тикет в поддержку и разбирал с ними вопрос, мне в конце ответили
-что это связанно с текущей ситуацией (хотя до этого получил дополнительный опыт, так как несколько раз менял на другие "default-ru-central1-a" в связи с событиями)
-а так же пробовал разные варианты выбора обьемов и размеров дисков и тп, прицепил скрин для инфо.
+До попадания БПЛА все прекрасно работало, к сожалению сейчас нельзя создавать новые диски, я писал тикет в поддержку и разбирал с ними вопрос, мне в конце ответили что это связанно с текущей ситуацией а так же пробовал разные варианты выбора обьемов и размеров дисков и тп.
 
 С модулем разобрался и добавил фишки с динамичным возвратом айпи адресов и id дисков для комфортной генерации инфраструктуры, понимания процесса и оценки отлично.
-
-
 
 До попадания 2 и 3го еще запускалось.
 
@@ -13,28 +9,26 @@
 
 Основные секреты вынесены отдельно, в гите только публичные ключи, не акцентировал на фул безопасности.
 
+На момент сдачи работы в облаке действуют временные ограничения (Resource allocation is restricted) на создание новых compute-дисков. Данный вопрос разбирался с поддержкой Yandex Cloud (тикет), ограничение связано с текущими событиями на стороне провайдера. Ранее инфраструктура успешно разворачивалась (terraform apply проходил).
+Настоящий код модуля валиден (terraform validate проходит успешно). Секреты (приватные ключи, стейты) вынесены в .gitignore, в репозитории находятся только публичные SSH-ключи и код.
+Прицепил скрин с ответом поодержки.
+
 
 # Terraform-модуль для развёртывания web/api в Yandex Cloud
+
+Учебный проект: модуль создаёт две ВМ (`web` и `api`), подключает к `api` список дополнительных дисков через блок `dynamic`, а также возвращает ID дисков и внутренние IP-адреса ВМ.
 
 ## Структура
 
 - `versions.tf` — версии Terraform и провайдера
-- `variables.tf` — входные переменные
-- `main.tf` — вызов дочерних модулей
+- `variables.tf` — входные переменные корневого модуля
+- `main.tf` — вызов дочерних модулей и настройка backend
 - `outputs.tf` — выходные значения
-- `modules/disks/` — модуль дисков
-- `modules/vms/` — модуль ВМ
-- `terraform.tfvars.dev` — параметры для dev
-- `terraform.tfvars.prod` — параметры для prod
+- `modules/disks/` — дочерний модуль дисков (использует `for_each`)
+- `modules/vms/` — дочерний модуль ВМ (`web`, `api`, `dynamic secondary_disk`, `data` для подсети)
+- `terraform.tfvars.dev` — параметры для dev-окружения
+- `terraform.tfvars.prod` — параметры для prod-окружения
 
-## Запуск для dev
-
-```bash
-terraform init
-terraform workspace new dev
-terraform workspace select dev
-terraform plan  -var-file="terraform.tfvars.dev"
-terraform apply -var-file="terraform.tfvars.dev"
 ## Требования
 
 - Terraform >= 1.5.0
@@ -48,7 +42,7 @@ terraform apply -var-file="terraform.tfvars.dev"
 | Имя | Тип | Описание | Значение по умолчанию |
 |---|---|---|---|
 | `zone` | string | Зона доступности | `ru-central1-a` |
-| `subnet_name` | string | Имя существующей подсети | `default-ru-central1-a` |
+| `name_prefix` | string | Префикс для имён ресурсов | `msa` |
 | `vm_names` | object | Имена ВМ web/api | `{ web = "web", api = "api" }` |
 | `extra_disk_names` | list(string) | Имена доп. дисков | `["logs", "backup"]` |
 | `extra_disk_type` | string | Тип дисков | `network-hdd` |
@@ -63,10 +57,27 @@ terraform apply -var-file="terraform.tfvars.dev"
 - `vm_specification.cores` = 2
 - `vm_specification.memory` ∈ {2, 4}
 - `vm_specification.disk_size` > 1
+- `core_fraction` — опциональный параметр (по умолчанию `20`)
 
 ## Запуск для dev
 
-```bash
 terraform init
+terraform workspace new dev
+terraform workspace select dev
 terraform plan  -var-file="terraform.tfvars.dev"
 terraform apply -var-file="terraform.tfvars.dev"
+
+## Запуск для prod
+terraform init
+terraform workspace new prod
+terraform workspace select prod
+terraform plan  -var-file="terraform.tfvars.prod"
+terraform apply -var-file="terraform.tfvars.prod"
+
+
+## Уничтожение инфраструктуры
+terraform workspace select dev
+terraform destroy -var-file="terraform.tfvars.dev"
+
+terraform workspace select prod
+terraform destroy -var-file="terraform.tfvars.prod"

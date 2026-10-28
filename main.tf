@@ -1,31 +1,6 @@
 # ============================================================================
 # ФАЙЛ: terraform-module-lab/main.tf
 # ============================================================================
-terraform {
-  required_providers {
-    yandex = {
-      source  = "yandex-cloud/yandex"
-      version = "~> 0.100"
-    }
-  }
-  required_version = ">= 1.5.0"
-
-  backend "s3" {
-    endpoints = {
-      s3 = "https://storage.yandexcloud.net"
-    }
-    bucket               = "msa-terraform"
-    region               = "ru-central1"
-    key                  = "terraform.tfstate"
-    workspace_key_prefix = "state" # Изолирует state для dev и prod
-
-    skip_region_validation      = true
-    skip_credentials_validation = true
-    skip_requesting_account_id  = true
-    skip_s3_checksum            = true
-    skip_metadata_api_check     = true
-  }
-}
 
 provider "yandex" {
   zone = var.zone

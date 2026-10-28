@@ -10,26 +10,21 @@
 # Публичный SSH-ключ
 ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCyE9xX0q4Ai/S2VfGp0XXezzgmB3yVHg1CJ7RH9jJN6o5FUhs4FsB4oUMjCCTBpKr/K6MmsHDJZO2ElXvoPrZAQmm6wMeGhy0sG3ka3C2Yxd70+j+XBDIwtrkAj/niPojNNddtHF11v7mu1SuCR1SqKLzB18v0OnWk2RpN9uZFzkjJOV9kO1F8H4w25q/pzlaS77rfLCNk9F04673iTzeqH47GefimvOE6gc7Txl/2Tvv+LKdrcbrOE1Wf3WkOR8sLS0/XW+JrNmWfdEJ0J4PtsEo6a3SefZN0Q1IxZZBfkHukWzMHhGdkUjNuwbupmNAzjwA5naqnfo/+25skJ89iXetIv2IROyVg05ynpyS+iEhvHhQ4djxQFN3D5BZCaPZ8Y2kO9dfBYmwO9biSABzBdJR6nIgl+mjeRcGhFBqnmSzLUNbNpPvzx9+v2RUwOWQ8E3H1lHRkvtZeFFAo9yJGxUQQaUUEhf8bWvSrXlppuHrrd9ZlW9qUuZeMG1cq4EwfBU6scK/Cd/sool3ahYRD46Ma5gGRtcsljAXo5FoqRDgfGHzUn/iCd3XtITBQA27/OdtpBgStklolkRGChJAc3qrSin08MIdcTfjJNohj4qv0cK2MrTJua0v2Bc/8+mfJ5Ex8k+lO6ACMJFmqYWKUtgFG9i2mSKLbr/xtAZw2gQ== ps@MacBook-Pro-Pavel.local"
 
-# Спецификация ВМ для dev: минимальные ресурсы, дешёвые диски.
-# memory = 2, disk_size = 8 — по значению по умолчанию.
 vm_specification = {
   web = {
-    cores     = 2
-    memory    = 2
+    cores         = 2
+    memory        = 2
     core_fraction = 20
-    disk_size = 8
-    boot_disk = "fd845dr9j4h2aaq1m6ko"
+    disk_size     = 10
+    boot_disk     = "fd845dr9j4h2aaq1m6ko"
   }
   api = {
-    cores     = 2
-    memory    = 2
+    cores         = 2
+    memory        = 2
     core_fraction = 20
-    disk_size = 8
-    boot_disk = "fd845dr9j4h2aaq1m6ko"
+    disk_size     = 10 
+    boot_disk     = "fd845dr9j4h2aaq1m6ko"
   }
 }
 
-# Два дополнительных диска, HDD — дешевле.
-extra_disk_names = []  #"logs", "backup" отключим создание дополнительных дисков
-extra_disk_type  = "network-hdd"
-extra_disk_size  = 10
+extra_disk_size = 20 
