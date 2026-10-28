@@ -1,9 +1,19 @@
+# ============================================================================
+# ФАЙЛ: terraform-module-lab/modules/vms/main.tf
+# ============================================================================
+
+# Читаем существующую подсеть (как требует задание)
+data "yandex_vpc_subnet" "default_subnet" {
+  name = "default-ru-central1-a"
+}
+
 resource "yandex_compute_instance" "web" {
   name = var.vm_names.web
+  zone = var.zone # Явно задаём зону
 
   resources {
-    cores  = var.vm_specification["web"].cores
-    memory = var.vm_specification["web"].memory
+    cores         = var.vm_specification["web"].cores
+    memory        = var.vm_specification["web"].memory
     core_fraction = var.vm_specification["web"].core_fraction
   }
 
@@ -15,7 +25,7 @@ resource "yandex_compute_instance" "web" {
   }
 
   network_interface {
-    subnet_id = var.subnet_id
+    subnet_id = data.yandex_vpc_subnet.default_subnet.id
     nat       = false
   }
 
@@ -28,10 +38,11 @@ resource "yandex_compute_instance" "web" {
 
 resource "yandex_compute_instance" "api" {
   name = var.vm_names.api
+  zone = var.zone # Явно задаём зону
 
   resources {
-    cores  = var.vm_specification["api"].cores
-    memory = var.vm_specification["api"].memory
+    cores         = var.vm_specification["api"].cores
+    memory        = var.vm_specification["api"].memory
     core_fraction = var.vm_specification["api"].core_fraction
   }
 
@@ -43,7 +54,7 @@ resource "yandex_compute_instance" "api" {
   }
 
   network_interface {
-    subnet_id = var.subnet_id
+    subnet_id = data.yandex_vpc_subnet.default_subnet.id
     nat       = false
   }
 

@@ -1,20 +1,15 @@
 # ============================================================================
 # ФАЙЛ: terraform-module-lab/modules/vms/variables.tf
-# РОЛЬ: объявление входных переменных модуля vms.
-# ЗНАЧЕНИЯ приходят из:
-#   - terraform-module-lab/main.tf → module "vms" { ... }
-# ИСПОЛЬЗУЮТСЯ в:
-#   - terraform-module-lab/modules/vms/main.tf
 # ============================================================================
 
 variable "vm_specification" {
   description = "Параметры ВМ"
   type = map(object({
-    cores     = number
-    memory    = number
-    core_fraction = number
-    disk_size = number
-    boot_disk = string
+    cores         = number
+    memory        = number
+    core_fraction = optional(number, 20)
+    disk_size     = number
+    boot_disk     = string
   }))
 }
 
@@ -40,9 +35,4 @@ variable "vm_names" {
     web = string
     api = string
   })
-}
-
-variable "subnet_id" {
-  description = "ID подсети для подключения ВМ"
-  type        = string
 }

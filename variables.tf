@@ -11,7 +11,7 @@ variable "zone" {
 variable "name_prefix" {
   description = "Уникальный префикс для имён ресурсов"
   type        = string
-  default     = "terron"
+  default     = "msa"
 }
 
 variable "vm_names" {
@@ -46,7 +46,7 @@ variable "extra_disk_type" {
 variable "extra_disk_size" {
   description = "Размер дополнительных дисков в ГБ"
   type        = number
-  default     = 8
+  default     = 20 # Исправлено по заданию
 
   validation {
     condition     = var.extra_disk_size > 1
@@ -57,27 +57,27 @@ variable "extra_disk_size" {
 variable "vm_specification" {
   description = "Параметры виртуальных машин web и api"
   type = map(object({
-    cores     = number
-    memory    = number
-    core_fraction = number
-    disk_size = number
-    boot_disk = string
+    cores         = number
+    memory        = number
+    core_fraction = optional(number, 20) # Опционально, по умолчанию 20
+    disk_size     = number
+    boot_disk     = string
   }))
 
   default = {
     web = {
-      cores     = 2
-      memory    = 2
-      core_fraction = 20 # ← дешевле
-      disk_size = 8
-      boot_disk = "fd845dr9j4h2aaq1m6ko"
+      cores         = 2
+      memory        = 2
+      core_fraction = 20
+      disk_size     = 10 # Исправлено по заданию
+      boot_disk     = "fd845dr9j4h2aaq1m6ko"
     }
     api = {
-      cores     = 2
-      memory    = 2
-      core_fraction = 20 # ← дешевле
-      disk_size = 8
-      boot_disk = "fd845dr9j4h2aaq1m6ko"
+      cores         = 2
+      memory        = 2
+      core_fraction = 20
+      disk_size     = 10
+      boot_disk     = "fd845dr9j4h2aaq1m6ko"
     }
   }
 
@@ -107,4 +107,3 @@ variable "ssh_public_key" {
   description = "Публичный SSH-ключ для доступа к ВМ"
   type        = string
 }
-

@@ -1,16 +1,36 @@
 # ============================================================================
 # ФАЙЛ: terraform-module-lab/main.tf
-# РОЛЬ: сборка модуля. Здесь вызываются три дочерних модуля:
-#       disks, network, vms.
 # ============================================================================
+terraform {
+  required_providers {
+    yandex = {
+      source  = "yandex-cloud/yandex"
+      version = "~> 0.100"
+    }
+  }
+  required_version = ">= 1.5.0"
+
+  backend "s3" {
+    endpoints = {
+      s3 = "https://storage.yandexcloud.net"
+    }
+    bucket               = "msa-terraform"
+    region               = "ru-central1"
+    key                  = "terraform.tfstate"
+    workspace_key_prefix = "state" # Изолирует state для dev и prod
+
+    skip_region_validation      = true
+    skip_credentials_validation = true
+    skip_requesting_account_id  = true
+    skip_s3_checksum            = true
+    skip_metadata_api_check     = true
+  }
+}
 
 provider "yandex" {
   zone = var.zone
 }
 
-# ============================================================================
-# Вызов дочернего модуля №1: диски.
-# ============================================================================
 module "disks" {
   source = "./modules/disks"
 
@@ -20,21 +40,6 @@ module "disks" {
   zone       = var.zone
 }
 
-# ============================================================================
-# Вызов дочернего модуля №2: сеть и подсеть.
-# ============================================================================
-module "network" {
-  source = "./modules/network"
-
-  zone         = var.zone
-  network_name = "lesson-terraform-network-${var.name_prefix}"
-  subnet_name  = "lesson-terraform-subnet-${var.name_prefix}"
-  subnet_cidr  = "10.128.0.0/24"
-}
-
-# ============================================================================
-# Вызов дочернего модуля №3: виртуальные машины.
-# ============================================================================
 module "vms" {
   source = "./modules/vms"
 
@@ -42,6 +47,5 @@ module "vms" {
   ssh_public_key   = var.ssh_public_key
   zone             = var.zone
   vm_names         = var.vm_names
-  subnet_id        = module.network.subnet_id
   extra_disk_ids   = values(module.disks.disk_ids)
 }
