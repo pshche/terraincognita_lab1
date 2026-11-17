@@ -79,7 +79,6 @@ func TestNoPublicIPsForWebAndApi(t *testing.T) {
 		assert.Truef(t, found, "ВМ %s не найдена в плане", name)
 	}
 }
-
 // TestExpectedVMsAndDisks проверяет состав инфраструктуры: ВМ web, api и доп. диски с именами logs/backup.
 func TestExpectedVMsAndDisks(t *testing.T) {
 	opts := options(t, nil)
@@ -87,10 +86,51 @@ func TestExpectedVMsAndDisks(t *testing.T) {
 
 	vms := map[string]bool{}
 	disks := map[string]bool{}
+    // Хранилище для привязок secondary_disk: ключ — имя ВМ, значение — слайс имен дисков
+    vmToDisks := map[string][]string{}
+    // Флаг для строгой проверки nat у ВМ api
+    apiHasNat := false
+
 	for _, rc := range plan.ResourceChanges {
 		switch rc.Type {
 		case "yandex_compute_instance":
 			vms[rc.Name] = true
+
+            // Строгая проверка: у ВМ api должен быть явно включен nat = true
+            if rc.Name == "api" {
+                after, ok := rc.Change.After.(map[string]interface{})
+                if !ok {
+                    t.Fatalf("не удалось привести Change.After ВМ api к map")
+                }
+                // Проверяем именно на true, отсутствие поля или любое другое значение (nil, false) провалит тест
+                if natVal, exists := after["nat"]; !(exists && natVal == true) {
+                    t.Fatalf("у ВМ api должен быть включен публичный ip (nat = true), текущее значение: %v", natVal)
+                }
+                apiHasNat = true
+            }
+
+            // Собираем привязки дисков к ВМ из блока secondary_disk
+            after, ok := rc.Change.After.(map[string]interface{})
+            if !ok {
+                continue
+            }
+            if secRaw, exists := after["secondary_disk"]; exists && secRaw != nil {
+                // Terraform может отдавать secondary_disk как map (один диск) или []interface{} (несколько)
+                switch v := secRaw.(type) {
+                case []interface{}:
+                    for _, item := range v {
+                        if diskMap, ok := item.(map[string]interface{}); ok {
+                            if diskName, ok := diskMap["disk_name"].(string); ok {
+                                vmToDisks[rc.Name] = append(vmToDisks[rc.Name], diskName)
+                            }
+                        }
+                    }
+                case map[string]interface{}:
+                    if diskName, ok := v["disk_name"].(string); ok {
+                        vmToDisks[rc.Name] = append(vmToDisks[rc.Name], diskName)
+                    }
+                }
+            }
 		case "yandex_compute_disk":
 			after, _ := rc.Change.After.(map[string]interface{})
 			if name, ok := after["name"].(string); ok {
@@ -102,6 +142,8 @@ func TestExpectedVMsAndDisks(t *testing.T) {
 	}
 	assert.True(t, vms["web"], "в плане должна быть ВМ web")
 	assert.True(t, vms["api"], "в плане должна быть ВМ api")
+    // Дополнительная строгая проверка, если цикл по ресурсам по какой-то причине не зашел в ветку api
+    assert.True(t, apiHasNat, "флаг nat для ВМ api не был проверен в основном цикле")
 
 	var hasLogs, hasBackup bool
 	for n := range disks {
@@ -114,6 +156,13 @@ func TestExpectedVMsAndDisks(t *testing.T) {
 	}
 	assert.True(t, hasLogs, "в плане должен быть дополнительный диск с 'logs' в имени")
 	assert.True(t, hasBackup, "в плане должен быть дополнительный диск с 'backup' в имени")
+
+    // Проверка, что именно api подключает оба диска через secondary_disk
+    apiDisks, apiHasDisks := vmToDisks["api"]
+    assert.True(t, apiHasDisks, "у ВМ api в конфигурации должен быть блок secondary_disk")
+    assert.Len(t, apiDisks, 2, "ВМ api должна подключать ровно два дополнительных диска")
+    assert.Contains(t, apiDisks, "logs", "ВМ api должна подключать диск logs через secondary_disk")
+    assert.Contains(t, apiDisks, "backup", "ВМ api должна подключать диск backup через secondary_disk")
 }
 
 // TestAdditionalProperty проверяет дополнительное свойство — размер доп. диска.
