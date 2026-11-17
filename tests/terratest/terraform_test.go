@@ -3,6 +3,7 @@ package terratest
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -10,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
 const terraformDir = "../../"
 
 const dummySSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7 dummy@terratest"
@@ -79,7 +79,6 @@ func TestNoPublicIPsForWebAndApi(t *testing.T) {
 		assert.Truef(t, found, "ВМ %s не найдена в плане", name)
 	}
 }
-
 // TestExpectedVMsAndDisks проверяет состав инфраструктуры: ВМ web, api и доп. диски с именами logs/backup.
 func TestExpectedVMsAndDisks(t *testing.T) {
 	opts := options(t, nil)
@@ -87,7 +86,9 @@ func TestExpectedVMsAndDisks(t *testing.T) {
 
 	vms := map[string]bool{}
 	disks := map[string]bool{}
+    // Хранилище для привязок secondary_disk: ключ — имя ВМ, значение — слайс имен дисков
     vmToDisks := map[string][]string{}
+    // Флаг для строгой проверки nat у ВМ api
     apiHasNat := false
 
 	for _, rc := range plan.ResourceChanges {
@@ -101,8 +102,7 @@ func TestExpectedVMsAndDisks(t *testing.T) {
                 if !ok {
                     t.Fatalf("не удалось привести Change.After ВМ api к map")
                 }
-                // ПРОВЕРКА: если в конфиге nat=false, этот тест упадет. 
-                // Нужно исправить .tf файлы, чтобы nat для api был true.
+                // Проверяем именно на true, отсутствие поля или любое другое значение (nil, false) провалит тест
                 if natVal, exists := after["nat"]; !(exists && natVal == true) {
                     t.Fatalf("у ВМ api должен быть включен публичный ip (nat = true), текущее значение: %v", natVal)
                 }
@@ -115,20 +115,26 @@ func TestExpectedVMsAndDisks(t *testing.T) {
                 continue
             }
             if secRaw, exists := after["secondary_disk"]; exists && secRaw != nil {
+                // Terraform может отдавать secondary_disk как map (один диск) или []interface{} (несколько)
                 switch v := secRaw.(type) {
                 case []interface{}:
-                    // В after нет disk_name, поэтому просто считаем количество и фиксируем привязку
-                    for range v {
-                        vmToDisks[rc.Name] = append(vmToDisks[rc.Name], "exists")
+                    for _, item := range v {
+                        if diskMap, ok := item.(map[string]interface{}); ok {
+                            if diskName, ok := diskMap["disk_name"].(string); ok {
+                                vmToDisks[rc.Name] = append(vmToDisks[rc.Name], diskName)
+                            }
+                        }
                     }
                 case map[string]interface{}:
-                    vmToDisks[rc.Name] = append(vmToDisks[rc.Name], "exists")
+                    if diskName, ok := v["disk_name"].(string); ok {
+                        vmToDisks[rc.Name] = append(vmToDisks[rc.Name], diskName)
+                    }
                 }
             }
 		case "yandex_compute_disk":
-			// ПРОВЕРКА: Имя диска (logs/backup) находится в rc.Index, а не в after["name"]
-			if rc.Index != nil {
-				disks[*rc.Index] = true
+			after, _ := rc.Change.After.(map[string]interface{})
+			if name, ok := after["name"].(string); ok {
+				disks[name] = true
 			} else {
 				disks[rc.Name] = true
 			}
@@ -136,17 +142,27 @@ func TestExpectedVMsAndDisks(t *testing.T) {
 	}
 	assert.True(t, vms["web"], "в плане должна быть ВМ web")
 	assert.True(t, vms["api"], "в плане должна быть ВМ api")
+    // Дополнительная строгая проверка, если цикл по ресурсам по какой-то причине не зашел в ветку api
     assert.True(t, apiHasNat, "флаг nat для ВМ api не был проверен в основном цикле")
 
-	// Проверка наличия дисков по их индексам (именам), так как поле name отсутствует в after
-	assert.True(t, disks["backup"], "в плане должен быть дополнительный диск backup")
-	assert.True(t, disks["logs"], "в плане должен быть дополнительный диск logs")
+	var hasLogs, hasBackup bool
+	for n := range disks {
+		if strings.Contains(n, "logs") {
+			hasLogs = true
+		}
+		if strings.Contains(n, "backup") {
+			hasBackup = true
+		}
+	}
+	assert.True(t, hasLogs, "в плане должен быть дополнительный диск с 'logs' в имени")
+	assert.True(t, hasBackup, "в плане должен быть дополнительный диск с 'backup' в имени")
 
     // Проверка, что именно api подключает оба диска через secondary_disk
     apiDisks, apiHasDisks := vmToDisks["api"]
     assert.True(t, apiHasDisks, "у ВМ api в конфигурации должен быть блок secondary_disk")
     assert.Len(t, apiDisks, 2, "ВМ api должна подключать ровно два дополнительных диска")
-    // Имена дисков в after отсутствуют, поэтому проверяем только факт наличия двух привязок
+    assert.Contains(t, apiDisks, "logs", "ВМ api должна подключать диск logs через secondary_disk")
+    assert.Contains(t, apiDisks, "backup", "ВМ api должна подключать диск backup через secondary_disk")
 }
 
 // TestAdditionalProperty проверяет дополнительное свойство — размер доп. диска.
@@ -165,7 +181,6 @@ func TestAdditionalProperty(t *testing.T) {
 		if !ok {
 			continue
 		}
-		// Поле size присутствует в after и равно 20 (float64)
 		if size, ok := after["size"].(float64); ok && int(size) == wantSize {
 			found = true
 			break
